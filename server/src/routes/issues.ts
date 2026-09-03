@@ -4070,6 +4070,11 @@ export function issueRoutes(
       }
       return assertFreshTaskWatchdogSourceMutation(res, watchdogScope, issue);
     }
+    if (issue.assigneeAgentId !== null && issue.assigneeAgentId !== actorAgentId) {
+      if (await hasActiveCheckoutManagementOverride(actorAgentId, issue.companyId, issue.assigneeAgentId)) {
+        return true;
+      }
+    }
     const boundaryDecision = await decideIssueAccess(req, issue, "issue:mutate");
     if (!boundaryDecision.allowed) {
       return denyIssueWrite(req, res, issue, issueWriteDenialCodeForDecision(boundaryDecision));
@@ -4078,9 +4083,6 @@ export function issueRoutes(
       return true;
     }
     if (issue.assigneeAgentId !== actorAgentId) {
-      if (await hasActiveCheckoutManagementOverride(actorAgentId, issue.companyId, issue.assigneeAgentId)) {
-        return true;
-      }
       if (issue.status === "in_progress") {
         // Run/checkout ownership stays assignee-scoped even though writes are
         // open, so this lock clears on its own — the copy routes to comments.
@@ -11107,9 +11109,14 @@ export function issueRoutes(
     const actorRunId = requireAgentRunId(req, res);
     if (req.actor.type === "agent" && !actorRunId) return;
 
+    const actorAgentId = req.actor.type === "agent" ? req.actor.agentId : undefined;
+    const hasOverride = actorAgentId && existing.assigneeAgentId && existing.assigneeAgentId !== actorAgentId
+      ? await hasActiveCheckoutManagementOverride(actorAgentId, existing.companyId, existing.assigneeAgentId)
+      : false;
+
     const released = await svc.release(
       id,
-      req.actor.type === "agent" ? req.actor.agentId : undefined,
+      hasOverride ? undefined : actorAgentId,
       actorRunId,
     );
     if (!released) {

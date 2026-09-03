@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "master"
+      - "lesbass-runtime-patches"
     tags:
       - "v*"
       - "nightly/v*"
@@ -160,6 +161,7 @@ jobs:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=canary,enable=${{ github.ref == 'refs/heads/master' }}
+            type=raw,value=runtime,enable=${{ github.ref == 'refs/heads/lesbass-runtime-patches' }}
             type=raw,value=nightly,enable=${{ startsWith(github.ref, 'refs/tags/nightly/v') }}
             type=raw,value=beta,enable=${{ startsWith(github.ref, 'refs/tags/beta/v') }}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}

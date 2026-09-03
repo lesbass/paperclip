@@ -899,9 +899,13 @@ export async function startServer(): Promise<StartedServer> {
     bindHost: runtimeListenHost,
     port: listenPort,
   });
-  const configuredApiUrl = process.env.PAPERCLIP_API_URL?.trim() || runtimeApiUrl;
+  // Keep the public runtime origin when a reverse proxy terminates TLS in
+  // front of Paperclip. This value is persisted into agent runtime context,
+  // so it must not be replaced by the container-local listener URL.
+  const configuredRuntimeApiUrl = process.env.PAPERCLIP_RUNTIME_API_URL?.trim() || runtimeApiUrl;
+  const configuredApiUrl = process.env.PAPERCLIP_API_URL?.trim() || configuredRuntimeApiUrl;
   const runtimeApiCandidates = buildRuntimeApiCandidateUrls({
-    preferredApiUrl: configuredApiUrl,
+    preferredApiUrl: process.env.PAPERCLIP_RUNTIME_API_URL?.trim() || configuredApiUrl,
     authPublicBaseUrl: config.authPublicBaseUrl ?? null,
     allowedHostnames: config.allowedHostnames,
     bindHost: runtimeListenHost,
@@ -909,7 +913,7 @@ export async function startServer(): Promise<StartedServer> {
   });
   process.env.PAPERCLIP_LISTEN_HOST = runtimeListenHost;
   process.env.PAPERCLIP_LISTEN_PORT = String(listenPort);
-  process.env.PAPERCLIP_RUNTIME_API_URL = runtimeApiUrl;
+  process.env.PAPERCLIP_RUNTIME_API_URL = configuredRuntimeApiUrl;
   process.env.PAPERCLIP_RUNTIME_API_CANDIDATES_JSON = JSON.stringify(runtimeApiCandidates);
   process.env.PAPERCLIP_API_URL = configuredApiUrl;
   
