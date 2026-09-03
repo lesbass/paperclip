@@ -3,6 +3,7 @@ import type { IncomingHttpHeaders } from "node:http";
 import { betterAuth, type Auth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { toNodeHandler } from "better-auth/node";
+import { auth0, genericOAuth } from "better-auth/plugins/generic-oauth";
 import type { Db } from "@paperclipai/db";
 import {
   authAccounts,
@@ -182,6 +183,22 @@ export function resolveWorkspaceHandoffIdentity(
   };
 }
 
+type Auth0Config = { domain: string; clientId: string; clientSecret: string };
+
+export function resolveAuth0Config(env: NodeJS.ProcessEnv = process.env): Auth0Config | null {
+  const domain = env.AUTH0_DOMAIN?.trim();
+  const clientId = env.AUTH0_CLIENT_ID?.trim();
+  const clientSecret = env.AUTH0_CLIENT_SECRET?.trim();
+  if (!domain && !clientId && !clientSecret) return null;
+  if (!domain || !clientId || !clientSecret) {
+    throw new Error("AUTH0_DOMAIN, AUTH0_CLIENT_ID, and AUTH0_CLIENT_SECRET must be set together.");
+  }
+  if (!/^[a-z0-9.-]+\.auth0\.com$/i.test(domain)) {
+    throw new Error("AUTH0_DOMAIN must be an Auth0 hostname without a scheme or path.");
+  }
+  return { domain, clientId, clientSecret };
+}
+
 export function createBetterAuthInstance(db: Db, config: Config, trustedOrigins: string[]): BetterAuthInstance {
   const baseUrl = config.authBaseUrlMode === "explicit" ? config.authPublicBaseUrl : undefined;
   const publicUrl = process.env.PAPERCLIP_PUBLIC_URL?.trim() || baseUrl;
@@ -199,6 +216,39 @@ export function createBetterAuthInstance(db: Db, config: Config, trustedOrigins:
     authPublicBaseUrl: config.authPublicBaseUrl,
     publicUrl,
   });
+  const auth0Config = resolveAuth0Config();
+  const plugins = [
+    ...(auth0Config
+      ? [genericOAuth({
+          config: [{
+            ...auth0({
+              domain: auth0Config.domain,
+              clientId: auth0Config.clientId,
+              clientSecret: auth0Config.clientSecret,
+              scopes: ["openid", "profile", "email"],
+              disableSignUp: true,
+            }),
+            requireEmailVerification: true,
+            requireIdTokenVerification: true,
+          }],
+        })]
+      : []),
+    ...(resolveWorkspaceHandoffIdentity(config)
+      ? [workspaceLoginHandoffPlugin({
+          db,
+          // Re-resolved per exchange so a hot restart cannot keep validating
+          // against an origin the control plane has since republished.
+          resolveExpectedIdentity: () =>
+            resolveWorkspaceHandoffIdentity(config) ?? {
+              key: null,
+              instanceId: null,
+              executionWorkspaceId: null,
+              companyId: null,
+              origin: null,
+            },
+        })]
+      : []),
+  ];
 
   const authConfig = {
     baseURL: baseUrl,
@@ -214,9 +264,9 @@ export function createBetterAuthInstance(db: Db, config: Config, trustedOrigins:
       },
     }),
     emailAndPassword: {
-      enabled: true,
+      enabled: !auth0Config,
       requireEmailVerification: false,
-      disableSignUp: config.authDisableSignUp,
+      disableSignUp: auth0Config ? true : config.authDisableSignUp,
     },
     rateLimit: buildBetterAuthRateLimitOptions({
       deploymentMode: config.deploymentMode,
@@ -224,28 +274,7 @@ export function createBetterAuthInstance(db: Db, config: Config, trustedOrigins:
       override: process.env.PAPERCLIP_AUTH_RATE_LIMIT_ENABLED,
     }),
     advanced: buildBetterAuthAdvancedOptions({ disableSecureCookies }),
-    // Registered only for a managed workspace instance: the plugin is what makes
-    // `Open workspace` password-independent, and a control-plane instance that
-    // was never handed a workspace key must not expose the exchange at all.
-    ...(resolveWorkspaceHandoffIdentity(config)
-      ? {
-          plugins: [
-            workspaceLoginHandoffPlugin({
-              db,
-              // Re-resolved per exchange so a hot restart cannot keep validating
-              // against an origin the control plane has since republished.
-              resolveExpectedIdentity: () =>
-                resolveWorkspaceHandoffIdentity(config) ?? {
-                  key: null,
-                  instanceId: null,
-                  executionWorkspaceId: null,
-                  companyId: null,
-                  origin: null,
-                },
-            }),
-          ],
-        }
-      : {}),
+    plugins,
   };
 
   if (!baseUrl) {
