@@ -7,6 +7,7 @@ import {
   deriveAuthCookiePrefix,
   deriveAuthTrustedOrigins,
   shouldDisableSecureAuthCookies,
+  resolveAuth0Config,
 } from "../auth/better-auth.js";
 
 const ORIGINAL_INSTANCE_ID = process.env.PAPERCLIP_INSTANCE_ID;
@@ -240,5 +241,16 @@ describe("Better Auth cookie scoping", () => {
     ]));
     expect(trustedOrigins).not.toContain("https://board.example.test:3100");
     expect(trustedOrigins).not.toContain("http://board.example.test:3100");
+  });
+});
+
+
+describe("downstream Auth0 configuration", () => {
+  it("keeps Auth0 opt-in and rejects incomplete or malformed configuration", () => {
+    expect(resolveAuth0Config({})).toBeNull();
+    expect(() => resolveAuth0Config({ AUTH0_DOMAIN: "example.auth0.com" })).toThrow("must be set together");
+    const env = { AUTH0_DOMAIN: "example.auth0.com", AUTH0_CLIENT_ID: "test-id", AUTH0_CLIENT_SECRET: "test-secret" };
+    expect(resolveAuth0Config(env)).toEqual({ domain: env.AUTH0_DOMAIN, clientId: env.AUTH0_CLIENT_ID, clientSecret: env.AUTH0_CLIENT_SECRET });
+    expect(() => resolveAuth0Config({ ...env, AUTH0_DOMAIN: "https://example.auth0.com/path" })).toThrow("without a scheme or path");
   });
 });

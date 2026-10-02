@@ -21,6 +21,7 @@ function RepoRow({ repo, onRemove }: { repo: ProjectRepository; onRemove: () => 
     </div>
   );
 }
+
 /** Shared by both review surfaces, ready to extract after design approval. */
 export function RepositoryEditor({ selected, onChange, state = "ready", available = [], onRetry, onConnect, disabled = false }: {
   selected: ProjectRepository[];
@@ -81,3 +82,4 @@ export function RepositoryEditor({ selected, onChange, state = "ready", availabl
     </fieldset>
   );
 }
+
