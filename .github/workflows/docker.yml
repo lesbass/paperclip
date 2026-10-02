@@ -53,10 +53,8 @@ jobs:
   # an hour, most runs were superseded before they ever started a job. Five of
   # ten master commits sampled that day never produced an image at all.
   #
-  # Each platform now builds on a runner of its own architecture and pushes by
-  # digest; `merge` assembles the manifest list. arm64 is kept rather than
-  # dropped (the cloud variant below dropped it and is amd64-only) because
-  # this is the self-hosted image, and ARM hosts consume it.
+  # The downstream homelab runs on amd64; publish only that architecture.
+  # The merge job tags the verified digest for deployment.
   build-and-push:
     strategy:
       # Independent legs: one architecture failing should still publish
@@ -68,9 +66,6 @@ jobs:
           - platform: linux/amd64
             runner: ubuntu-latest
             arch: amd64
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            arch: arm64
     runs-on: ${{ matrix.runner }}
     # Native builds land well inside this; it is a backstop, not a budget.
     # (The interim fix while this PR landed raised the single QEMU job's cap
@@ -328,6 +323,7 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
+            type=raw,value=runtime,enable=${{ github.ref == 'refs/heads/lesbass-runtime-patches' }}
             type=raw,value=nightly,enable=${{ startsWith(github.ref, 'refs/tags/nightly/v') }}
             type=raw,value=beta,enable=${{ startsWith(github.ref, 'refs/tags/beta/v') }}
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
@@ -368,7 +364,7 @@ jobs:
   # and manual Docker dispatches call the same implementation, preserving the
   # release tags and the canary promotion dependency below.
   build-and-push-cloud:
-    if: github.event_name != 'push' || github.ref != 'refs/heads/master'
+    if: github.ref != 'refs/heads/lesbass-runtime-patches' && (github.event_name != 'push' || github.ref != 'refs/heads/master')
     uses: ./.github/workflows/docker-cloud.yml
     permissions:
       contents: read

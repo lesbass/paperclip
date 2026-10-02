@@ -49,3 +49,7 @@ backup before applying the release migrations.
   after these baseline comparisons; the full suite did not finish.
 - This alignment publishes fork source and an image build only. Production
   promotion remains pending, including backup and runtime verification.
+
+The downstream Docker workflow builds only Linux/amd64 and skips the cloud
+image on `lesbass-runtime-patches`, matching the homelab deployment target.
+The manifest publication job retains the `runtime` tag as well as `sha-*`.
