@@ -1,7 +1,7 @@
 # LesBass downstream build
 
 `lesbass-runtime-patches` is the operational downstream branch for the public
-`lesbass/paperclip` fork. It is aligned with upstream `v2026.1001.0`; the existing
+`lesbass/paperclip` fork. It is aligned with upstream `v2026.1005.0`; the existing
 `master` branch and its historical branches are intentionally untouched.
 
 The branch contains source-level compatibility patches:
@@ -53,3 +53,11 @@ backup before applying the release migrations.
 The downstream Docker workflow builds only Linux/amd64 and skips the cloud
 image on `lesbass-runtime-patches`, matching the homelab deployment target.
 The manifest publication job retains the `runtime` tag as well as `sha-*`.
+
+## Alignment (2026-10-07)
+
+Merged upstream v2026.1005.0, retaining Auth0-only login, runtime origin,
+checkout-management overrides and amd64 runtime image publishing. Removed
+the obsolete cloud workflow call (upstream removed the reusable workflow).
+Auth0 login adopts the upstream return-path validation and session error state.
+Migrations 0284–0293 require a verified pre-deployment database backup.

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "@/lib/router";
 import { authApi } from "../api/auth";
+import { tenantSignInReturnPath } from "@/lib/cloudLinks";
 import { queryKeys } from "../lib/queryKeys";
 import { getRememberedInvitePath } from "../lib/invite-memory";
 import { Button } from "@/components/ui/button";
@@ -15,8 +16,8 @@ export function AuthPage() {
   const [searchParams] = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const nextPath = useMemo(() => searchParams.get("next") || getRememberedInvitePath() || "/", [searchParams]);
-  const { data: session, isLoading: isSessionLoading } = useQuery({ queryKey: queryKeys.auth.session, queryFn: () => authApi.getSession(), retry: false });
+  const nextPath = useMemo(() => tenantSignInReturnPath(searchParams.get("next") || getRememberedInvitePath() || "/"), [searchParams]);
+  const { data: session, isLoading: isSessionLoading, error: sessionError } = useQuery({ queryKey: queryKeys.auth.session, queryFn: () => authApi.getSession(), retry: false });
 
   useEffect(() => { if (session) navigate(nextPath, { replace: true }); }, [session, navigate, nextPath]);
 
@@ -30,7 +31,8 @@ export function AuthPage() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to start Auth0 sign-in."); setIsRedirecting(false); }
   };
 
-  if (isSessionLoading) return <div className="fixed inset-0 flex items-center justify-center"><PaperclipLoading className="min-h-0" /></div>;
+  if (sessionError) return <p role="alert" className="p-6 text-sm text-destructive">Unable to check sign-in. Refresh and try again.</p>;
+  if (isSessionLoading || session) return <div className="fixed inset-0 flex items-center justify-center"><PaperclipLoading className="min-h-0" /></div>;
   return <div className="fixed inset-0 flex bg-background">
     <div className="absolute top-4 right-4 z-10"><ThemeToggle /></div>
     <div className="w-full md:w-1/2 flex flex-col overflow-y-auto"><div className="w-full max-w-md mx-auto my-auto px-8 py-12">
